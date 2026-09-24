@@ -1,4 +1,4 @@
-name: Ansible CI — Fast checks + Molecule + Windows integration
+name: Ansible CI - Fast checks + Molecule + Windows integration
 
 on:
   workflow_call:
@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHON_VERSION: ${{ inputs.python_version || '3.11' }}
-      DEPLOY_KEY: ${{ secrets.VUIT_WS_ANS }}    # <-- expose secret to env for condition checks
+      DEPLOY_KEY: ${{ secrets.WS_ANS_SSH }}    # <-- expose secret to env for condition checks
     steps:
       - name: Checkout (caller repo when invoked via workflow_call)
         if: ${{ github.event_name == 'workflow_call' }}
@@ -81,7 +81,7 @@ jobs:
         if: ${{ env.DEPLOY_KEY != '' }}         # <-- use env here (allowed)
         uses: webfactory/ssh-agent@v0.10.0
         with:
-          ssh-private-key: ${{ secrets.VUIT_WS_ANS }}
+          ssh-private-key: ${{ secrets.WS_ANS_SSH }}
 
       - name: Add GitHub to known_hosts
         if: ${{ env.DEPLOY_KEY != '' }}         # <-- use env here
