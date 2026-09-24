@@ -1,3 +1,4 @@
+---
 name: Ansible CI - Fast checks + Molecule + Windows integration
 
 on:
@@ -21,7 +22,7 @@ on:
     secrets:
       token:
         required: true
-      VUIT_WS_ANS:
+      WS_ANS_SSH:
         required: true
 
   # push:

@@ -1,18 +1,38 @@
 ---
 extends: default
+
 rules:
   line-length:
     max: 120
-    level: warning
-  document-start: disable
-  braces:
-    forbid: false
-    min-spaces-inside: 0
-    max-spaces-inside: 1
-    min-spaces-inside-empty: -1
-    max-spaces-inside-empty: -1
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
   comments:
     min-spaces-from-content: 1
+
+  comments-indentation: false
+
+  braces:
+    max-spaces-inside: 1
+
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+
   truthy:
     ignore: |
       .github/workflows/*.yml
+
+
+ignore: |
+  # exact path(s)
+  roles/*/molecule/azure-windows/vault.yml
+  # common vault names anywhere in the repo
+  # **/vault.yml
+  # **/vault.yaml
+  # **/*vault*.yml
+  # **/*vault*.yaml
+  .git/
+  .venv/
+  **/.tox/
+  **/site-packages/
