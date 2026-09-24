@@ -1,3 +1,4 @@
+---
 name: Ansible CI - Fast checks + Molecule + Windows integration
 
 on:
