@@ -1,0 +1,16 @@
+---
+name: YAML Lint
+
+on:
+  workflow_call:
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4.3.0
+      - name: Run yaml Lint
+        uses: ibiqlik/action-yamllint@v3.1.1
+        with:
+          config_file: .yamllint.yml

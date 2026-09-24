@@ -1,0 +1,111 @@
+name: Ansible CI — Fast checks + Molecule + Windows integration
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: 'Python version to use'
+        required: false
+        type: string
+        default: '3.11'
+      run_yamllint:
+        description: 'Whether to run yamllint'
+        required: false
+        type: boolean
+        default: true
+      ref:
+        description: 'Optional git ref to check out (caller can pass github.ref)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      token:
+        required: true
+      VUIT_WS_ANS:
+        required: true
+
+  # push:
+  #   branches: ['**']
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch: {}
+
+concurrency:
+  group: "ansible-ci-${{ inputs.ref || github.event.ref || github.sha }}"  # group by the ref being tested
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quick_checks:
+    name: Quick checks (yamllint, syntax, ansible-lint)
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_VERSION: ${{ inputs.python_version || '3.11' }}
+      DEPLOY_KEY: ${{ secrets.VUIT_WS_ANS }}    # <-- expose secret to env for condition checks
+    steps:
+      - name: Checkout (caller repo when invoked via workflow_call)
+        if: ${{ github.event_name == 'workflow_call' }}
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.repository.full_name }}
+          ref: ${{ inputs.ref || github.event.ref || github.sha }}
+          token: ${{ secrets.token }}            # <-- pass the token here
+
+      - name: Checkout (self when run in this repo)
+        if: ${{ github.event_name != 'workflow_call' }}
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install "yamllint>=1.30" "ansible>=2.15" "ansible-lint>=6"
+
+      - name: Start ssh-agent and add deploy key
+        if: ${{ env.DEPLOY_KEY != '' }}         # <-- use env here (allowed)
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.VUIT_WS_ANS }}
+
+      - name: Add GitHub to known_hosts
+        if: ${{ env.DEPLOY_KEY != '' }}         # <-- use env here
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      # now git over ssh will use the deploy key
+
+      - name: Install ansible-galaxy collections/roles (if present)
+        run: |
+          if [ -f requirements.yml ]; then ansible-galaxy collection install -r requirements.yml || true; fi
+
+      - name: Run yamllint (repo)
+        if: ${{ inputs.run_yamllint }}
+        run: yamllint -f parsable .
+
+      - name: Ansible Syntax Check (root playbooks)
+        run: |
+          while IFS= read -r pb; do
+            echo "Syntax-checking $pb"
+            ansible-playbook -i localhost, -c local --syntax-check "$pb"
+          done < <(find . -maxdepth 1 -type f \( -name "playbook*.yml" -o -name "site*.yml" \))
+
+      - name: ansible-lint (repo)
+        run: ansible-lint -v .

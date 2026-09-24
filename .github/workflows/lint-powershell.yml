@@ -1,0 +1,125 @@
+---
+name: PowerShell Lint
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      exclude_dirs:
+        type: string
+        required: false
+      exclude_files:
+        type: string
+        description: 'JSON array of file names to exclude from the sync'
+        required: false
+
+jobs:
+  powershell-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4.3.0
+      - name: Display the path
+        shell: pwsh
+        run: echo ${env:PATH}
+      - name: Version Display
+        shell: pwsh
+        run: $PSVersionTable
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: Install-Module -Name PSScriptAnalyzer -Force -AllowClobber
+
+      - name: Analyze the scripts
+        shell: pwsh
+        run: |
+          $baseExcludeDirectories = @('.github')
+          Write-Host "Inputs: ${{ inputs.exclude_dirs }}"
+          $sourceExcludeDirs = ${{ inputs.exclude_dirs }}
+          Write-Host "Inputs: ${{ inputs.exclude_files }}"
+          $sourceExcludeFiles = ${{ inputs.exclude_files }}
+
+          $excludeDirs = @()
+          if (-not $sourceExcludeDirs) {
+            Write-Output 'No source defined directories'
+          } else {
+            foreach ($Dir in $sourceExcludeDirs) {
+              $excludeDirs += $Dir
+            }
+            Write-Host 'excludeDirs after Source:'
+            $excludeDirs
+          }
+
+          foreach ($Dir in $baseExcludeDirectories) {
+            $excludeDirs += $Dir
+          }
+          Write-Host 'excludeDirs after Base:'
+          $excludeDirs
+
+          function Get-ChildItemsExcludingDirectories {
+            param (
+              [string]$Path
+            )
+
+            # Get all child items in the current directory
+            $items = Get-ChildItem -Path $Path -Recurse -Depth 0
+
+            foreach ($item in $items) {
+              $exclude = $false
+
+              # Check if the item is a directory and if it's in the exclusion list
+              if ($item.PSIsContainer) {
+                foreach ($exclusion in $excludeDirs) {
+                  if ($item.Name -like $exclusion) {
+                    $exclude = $true
+                    break
+                  }
+                }
+              }
+
+              if (-not $exclude) {
+                if ($item.PSIsContainer) {
+                  # Recursively call this function for directories that are not excluded
+                  Get-ChildItemsExcludingDirectories -Path $item.FullName
+                } else {
+                  # Output the file if it is not in an excluded directory
+                  $item.FullName
+                }
+              }
+            }
+          }
+
+          # Call the custom function to list all files
+
+          $ChildItems = Get-ChildItemsExcludingDirectories -Path '.'
+          Write-Host 'ChildItems after Get-ChildItemsExcludingDirectories:'
+          $ChildItems
+
+          if (-not $sourceExcludeFiles) {
+            $finalChildItems = $ChildItems
+          } else {
+            foreach ($Object in $sourceExcludeFiles) {
+              $finalChildItems = $ChildItems | Where-Object { $_ -notmatch $Object }
+            }
+            Write-Host 'finalChildItems after Object:'
+            $finalChildItems
+          }
+
+          $PSResults = foreach ($Item in $finalChildItems) {
+            Invoke-ScriptAnalyzer -Path $Item -Settings '.\PSScriptAnalyzerSettings.psd1'
+          }
+
+          Write-Output "Results:"
+          $PSResults
+
+          $PSResults.Count
+
+          if ($PSResults.Count -gt 0) {
+            $LASTEXITCODE = $PSResults.Count
+          } else {
+            $LASTEXITCODE = 0
+          }
+
+          exit $LASTEXITCODE

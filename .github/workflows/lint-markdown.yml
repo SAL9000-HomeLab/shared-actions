@@ -1,0 +1,16 @@
+---
+name: Markdown Lint
+
+on:
+  workflow_call:
+
+jobs:
+  markdownlint-cli2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Run Markdown Lint
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: "**/*.md"

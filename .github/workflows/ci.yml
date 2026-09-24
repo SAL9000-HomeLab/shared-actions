@@ -1,0 +1,46 @@
+---
+name: Linting Validation
+run-name: ${{ github.base_ref }}
+
+on:
+  pull_request:
+    branches:
+      - 'dev'
+      - 'main'
+
+env:
+  exclude_dirs: ${{ vars.EXCLUDE_DIRS }}
+  exclude_files: ${{ vars.EXCLUDE_FILES }}
+
+jobs:
+  lint-markdown:
+    uses: ./.github/workflows/lint-markdown.yml
+
+  markdown-link-checker:
+    uses: ./.github/workflows/markdown-link-checker.yml
+    permissions:
+      pull-requests: read
+      contents: read
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+
+  lint-yaml:
+    uses: ./.github/workflows/lint-yaml.yml
+
+  lint-powershell:
+    uses: ./.github/workflows/lint-powershell.yml
+    with:
+      environment: ${{ github.ref_name }}
+      exclude_dirs: ${{ vars.EXCLUDE_DIRS }}
+      exclude_files: ${{ vars.EXCLUDE_FILES }}
+
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4.3.0
+      - name: Check workflow files
+        shell: bash
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
