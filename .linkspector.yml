@@ -4,3 +4,4 @@ dirs:
 useGitIgnore: true
 ignorePatterns:
   - pattern: '^https:\/\/github\.com\/Bocephus.*$'
+  - pattern: '^https:\/\/github\.com\/SAL9000-HomLab.*$'
